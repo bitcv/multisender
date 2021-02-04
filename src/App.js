@@ -22,7 +22,7 @@ const PrivateRoute = ({ component: Component, startedUrl, ...rest }) => (
 );
 
 @inject("UiStore")
-export class App extends React.Component {
+class App extends React.Component {
   constructor(props){
     super(props);
     this.web3Store = props.UiStore.web3Store;
@@ -46,3 +46,5 @@ export class App extends React.Component {
     );
   }
 }
+
+export default App

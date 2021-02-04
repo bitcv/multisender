@@ -1,20 +1,16 @@
-const rewireMobX = require('react-app-rewire-mobx');
-// const rewirePreact = require('react-app-rewire-preact');
-// const {injectBabelPlugin} = require('react-app-rewired');
+const {
+  override,
+  fixBabelImports,
+  addLessLoader,
+} = require("customize-cra");
 
-/* config-overrides.js */
-module.exports = function override(config, env) {
-  // add a plugin
-  // config = injectBabelPlugin('emotion/babel',config)
-  
-  // use the Preact rewire
-  if (env === "production") {
-    console.log("⚡ Production build with Preact");
-    // config = rewirePreact(config, env);
-  }
-  
-  // use the MobX rewire
-  config = rewireMobX(config,env);
-  
-  return config;
-}
+
+module.exports = override(
+  fixBabelImports("import", {
+    libraryName: "antd", libraryDirectory: "es", style: true // change importing css to less
+  }),
+  addLessLoader({
+    javascriptEnabled: true,
+    modifyVars: { "@primary-color": "#1DA57A" }
+  })
+);
