@@ -43,8 +43,8 @@ export class ThirdStep extends React.Component {
     if( new BN(this.tokenStore.totalCostInEth).gt(new BN(this.tokenStore.ethBalance))){
       console.error('please fund you account in ')
       swal({
-        title: "Insufficient ETH balance",
-        text: `You don't have enough ETH to send to all addresses. Amount needed: ${this.tokenStore.totalCostInEth} ETH`,
+        title: "Insufficient " + this.tokenStore.web3Store.mainSymbol + " balance",
+        text: `You don't have enough ${this.tokenStore.web3Store.mainSymbol} to send to all addresses. Amount needed: ${this.tokenStore.totalCostInEth} ${this.tokenStore.web3Store.mainSymbol} `,
         icon: "error",
       })
       return
@@ -97,10 +97,10 @@ export class ThirdStep extends React.Component {
                 </div>
                 <div className="send-info-i">
                   <p>Your Contract's Current fee Per tx</p>
-                  <p className="send-info-amount">{this.tokenStore.currentFee} ETH</p>
+                  <p className="send-info-amount">{this.tokenStore.currentFee}  {this.tokenStore.web3Store.mainSymbol}  </p>
                 </div>
                 <div className="send-info-i">
-                  <p>Your ETH Balance</p>
+                  <p>Your {this.tokenStore.web3Store.mainSymbol} Balance</p>
                   <p className="send-info-amount">{this.tokenStore.ethBalance}</p>
                 </div>
               </div>
@@ -120,7 +120,7 @@ export class ThirdStep extends React.Component {
                 <div className="send-info-i">
                   <p>Approximate Cost of Operation</p>
                   <p className="send-info-amount">
-                  {this.tokenStore.totalCostInEth} ETH        
+                  {this.tokenStore.totalCostInEth} {this.tokenStore.web3Store.mainSymbol}        
                   </p>
                 </div>
                 <div className="send-info-i">

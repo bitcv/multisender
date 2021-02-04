@@ -29,7 +29,8 @@ export class App extends React.Component {
   }
   render(){
     let startedUrl = this.web3Store.startedUrl;
-    console.log('fix reset');
+    console.log('fix reset' + startedUrl);
+    console.log(this.web3Store)
     return (
       <div>
         <Header />

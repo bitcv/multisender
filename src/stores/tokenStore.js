@@ -120,6 +120,9 @@ class TokenStore {
         const web3 = this.web3Store.web3;
         const multisender = new web3.eth.Contract(StormMultiSenderABI, this.proxyMultiSenderAddress);
         this.arrayLimit = await multisender.methods.arrayLimit().call();
+        if(!parseInt(this.arrayLimit)){
+          this.arrayLimit = "200";
+        }
         return this.arrayLimit
       }) 
     }
@@ -245,10 +248,9 @@ class TokenStore {
   @computed get totalCostInEth(){
     const standardGasPrice = Web3Utils.toWei(this.gasPriceStore.selectedGasPrice.toString(), 'gwei');
     const currentFeeInWei = Web3Utils.toWei(this.currentFee);
-    const tx = new BN(standardGasPrice).times(new BN('5000000'))
+    const tx = new BN(standardGasPrice).times(new BN('50000'))
     const txFeeMiners = tx.times(new BN(this.totalNumberTx))
-    const contractFee = new BN(currentFeeInWei).times(this.totalNumberTx);
-    
+    let contractFee = new BN(currentFeeInWei).times(this.totalNumberTx);
     return Web3Utils.fromWei(txFeeMiners.plus(contractFee).toString(10))
   }
 

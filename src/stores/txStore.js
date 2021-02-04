@@ -28,8 +28,8 @@ class TxStore {
     clearInterval(this.interval);
   }
 
-  @action
-  async doSend(){
+  @action 
+  doApprove(){
     this.keepRunning = true;
     this.txs = [];
     this.approval = '';
@@ -49,6 +49,27 @@ class TxStore {
         }
       }, 3000)
       this.interval = interval;
+    } else {
+      swal({
+        title: "Already Approved",
+        text: `You have already approved the use of ${this.tokenStore.tokenSymbol} with ${this.tokenStore.totalBalance}`,
+        icon: "error",
+      })
+    }
+  }
+
+  @action
+  async doSend(){
+    this.keepRunning = true;
+    this.txs = [];
+    this.approval = '';
+    if(new BN(this.tokenStore.totalBalance).gt(new BN(this.tokenStore.allowance))){
+      // swal({
+      //   title: "Have to approval use of " + this.tokenStore.tokenSymbol,
+      //   text: `You have to  approve the use of ${this.tokenStore.tokenSymbol} with ${this.tokenStore.totalBalance}`,
+      //   icon: "error",
+      // })
+      this.doApprove()
     } else {
       this._multisend({slice: this.tokenStore.totalNumberTx, addPerTx: this.tokenStore.arrayLimit})
     }
@@ -164,7 +185,7 @@ class TxStore {
       const web3 = this.web3Store.web3;
       web3.eth.getTransactionReceipt(hash, (error, res) => {
         if(res && res.blockNumber){
-          if(res.status === '0x1'){
+          if(res.status === '0x1' || res.status === true){
             const index = this.txHashToIndex[hash]
             this.txs[index].status = `mined`
           } else {
