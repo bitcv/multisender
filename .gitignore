@@ -2,3 +2,5 @@ node_modules
 .env
 build
 contracts/.secret
+config
+scripts
