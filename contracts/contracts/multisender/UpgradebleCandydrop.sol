@@ -32,6 +32,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
     
     struct Packet {
         address token;
+        address owner;
         uint32 packetId;
         uint8 packetType;
         uint256 packetAmount;
@@ -48,7 +49,6 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
 
     uint8 PACKET_TYPE_LUCKY = 1;
     uint8 PACKET_TYPE_AVG = 2;
-    
 
     modifier hasFee() {
         if (currentFee(msg.sender) > 0) {
@@ -115,15 +115,15 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         uint256 count = txCount(_customer);
         return count.mul(discountStep());
     }
-    function randomId(uint256 seed) public view returns (uint32) {
+    function randomId(uint256 seed) private view returns (uint32) {
         uint32 packetId = uint32(keccak256(block.timestamp, block.difficulty, seed));
         return packetId;
     }
-    function randomSecretId(string secret) public view returns (uint32){
+    function randomSecretId(string secret) private view returns (uint32){
         uint32 packetId = uint32(keccak256(block.timestamp, block.difficulty, secret));
         return packetId;
     }
-    function sendPacket(uint32 packetId, address token, uint8 packetType, uint256 packetAmount, uint8 packetCount) public hasFee payable{
+    function sendPacket(uint32 packetId, address token, uint8 packetType, uint256 packetAmount, uint8 packetCount) private{
         //先存储
         packetsendToken(token, packetAmount);
         
@@ -136,6 +136,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         packet.packetCount = packetCount;
         packet.remainAmount = packetAmount;
         packet.remainCount = packetCount;
+        packet.owner = msg.sender;
         //  = Packet({
         //      token:token,
         //      packetId:packetId,
@@ -227,6 +228,10 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         packets[packetId].bufferAddresses.push(msg.sender);
         
         if(remainCount <= 0 || packets[packetId].bufferAddresses.length > 10){
+            distributePacket(packetId);
+        }
+    }
+    function distributePacket(uint32 packetId) private{
             uint256 i = 0;
             uint256 len =  packets[packetId].bufferAddresses.length;
             uint256 [] memory balances = new uint256[](len);
@@ -243,7 +248,11 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
                     delete packets[packetId].bufferAddresses[i];
                 }
             }
-        }
+    }
+    function getMyAmount(uint32 packetId, address user) public view returns(uint256){
+        Packet storage packet = packets[packetId];
+        require(packet.receivers[user]>0, 'you did not claim');
+        return packet.receivers[user];
     }
     function getSeedPacketId(uint256 seed) public view returns(uint32){
         return uint32(uintStorage[keccak256("pp", seed)]);
@@ -260,7 +269,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
 
         claimPacket(packetId);
     }
-    function packetsendToken(address token, uint256 amount) public hasFee payable {
+    function packetsendToken(address token, uint256 amount) private {
         if (token == 0x000000000000000000000000000000000000bEEF){
             packetsendEther();
         } else {
@@ -284,8 +293,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
             emit Packetended(total, token);
         }
     }
-
-    function packetsendEther() public payable {
+    function packetsendEther() private {
         uint256 total = msg.value;
         uint256 pfee = currentFee(msg.sender);
         require(total >= pfee);
@@ -303,25 +311,30 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         }
         emit Packetstarted(total, 0x000000000000000000000000000000000000bEEF);
     }
-    function multisendEther(address[] _contributors, uint256[] _balances) public payable {
-        uint256 total = msg.value;
-        uint256 pfee = currentFee(msg.sender);
-        require(total >= pfee);
-        require(_contributors.length <= arrayLimit());
-        total = total.sub(pfee);
-        uint256 i = 0;
-        for (i; i < _contributors.length; i++) {
-            require(total >= _balances[i]);
-            total = total.sub(_balances[i]);
-            _contributors[i].transfer(_balances[i]);
+    
+    function claimMyPacket(uint32 packetId) public{
+        Packet storage packet = packets[packetId];
+        require(msg.sender == packet.owner);
+        require(packet.remainCount > 0 && packet.remainAmount > 0);
+        distributePacket(packetId);
+        if(packet.token == 0x000000000000000000000000000000000000bEEF){
+            msg.sender.transfer(packet.remainAmount);
+            packets[packetId].remainCount = 0;
+            packets[packetId].remainAmount = 0;
+            emit ClaimedTokens(packet.token, msg.sender, packet.remainAmount);
+            return;
         }
-        setTxCount(msg.sender, txCount(msg.sender).add(1));
-        emit Packetstarted(msg.value, 0x000000000000000000000000000000000000bEEF);
+        ERC20 erc20token = ERC20(packet.token);
+        erc20token.transfer(msg.sender, packet.remainAmount);
+        packets[packetId].remainCount = 0;
+        packets[packetId].remainAmount = 0;
+        emit ClaimedTokens(packet.token, msg.sender, packet.remainAmount);
     }
 
     function claimTokens(address _token) public onlyOwner {
         if (_token == 0x0) {
             owner().transfer(address(this).balance);
+            emit ClaimedTokens(_token, owner(), balance);
             return;
         }
         ERC20 erc20token = ERC20(_token);
