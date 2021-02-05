@@ -37,7 +37,7 @@ contract Claimable is EternalStorage, Ownable {
     * @dev Allows the pendingOwner address to finalize the transfer.
     */
     function claimOwnership() public onlyPendingOwner {
-        OwnershipTransferred(owner(), pendingOwner());
+       emit OwnershipTransferred(owner(), pendingOwner());
         addressStorage[keccak256("owner")] = addressStorage[keccak256("pendingOwner")];
         addressStorage[keccak256("pendingOwner")] = address(0);
     }

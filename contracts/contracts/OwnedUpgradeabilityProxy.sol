@@ -47,7 +47,7 @@ contract OwnedUpgradeabilityProxy is UpgradeabilityOwnerStorage, UpgradeabilityP
     */
     function transferProxyOwnership(address newOwner) public onlyProxyOwner {
         require(newOwner != address(0));
-        ProxyOwnershipTransferred(proxyOwner(), newOwner);
+        emit ProxyOwnershipTransferred(proxyOwner(), newOwner);
         setUpgradeabilityOwner(newOwner);
     }
 

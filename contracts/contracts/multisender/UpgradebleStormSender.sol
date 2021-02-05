@@ -112,16 +112,16 @@ contract UpgradebleStormSender is OwnedUpgradeabilityStorage, Claimable {
                 total += _balances[i];
             }
             setTxCount(msg.sender, txCount(msg.sender).add(1));
-            Multisended(total, token);
+            emit Multisended(total, token);
         }
     }
 
     function multisendEther(address[] _contributors, uint256[] _balances) public payable {
         uint256 total = msg.value;
-        uint256 fee = currentFee(msg.sender);
-        require(total >= fee);
+        uint256 txfee = currentFee(msg.sender);
+        require(total >= txfee);
         require(_contributors.length <= arrayLimit());
-        total = total.sub(fee);
+        total = total.sub(txfee);
         uint256 i = 0;
         for (i; i < _contributors.length; i++) {
             require(total >= _balances[i]);
@@ -129,7 +129,7 @@ contract UpgradebleStormSender is OwnedUpgradeabilityStorage, Claimable {
             _contributors[i].transfer(_balances[i]);
         }
         setTxCount(msg.sender, txCount(msg.sender).add(1));
-        Multisended(msg.value, 0x000000000000000000000000000000000000bEEF);
+        emit Multisended(msg.value, 0x000000000000000000000000000000000000bEEF);
     }
 
     function claimTokens(address _token) public onlyOwner {
@@ -140,7 +140,7 @@ contract UpgradebleStormSender is OwnedUpgradeabilityStorage, Claimable {
         ERC20 erc20token = ERC20(_token);
         uint256 balance = erc20token.balanceOf(this);
         erc20token.transfer(owner(), balance);
-        ClaimedTokens(_token, owner(), balance);
+       emit ClaimedTokens(_token, owner(), balance);
     }
     
     function setTxCount(address customer, uint256 _txCount) private {
