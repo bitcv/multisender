@@ -40,7 +40,9 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         uint256 remainAmount;
         uint256 remainCount;
         mapping(address => uint256)  receivers;
+        address maxAddress;
         address[] bufferAddresses;
+        address[] addresses;
     }
     mapping(uint256 => Packet) public packets;
     event Packetstarted(uint256 total, address tokenAddress);
@@ -210,6 +212,9 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         require(packet.remainCount > 0, 'no remain left');
         require(!(packet.receivers[msg.sender]>0), 'only claim once');
 
+        if(packet.remainCount == packet.packetCount){
+            packets[packetId].maxAddress = msg.sender;
+        }
         uint256 remainAmount = packet.remainAmount;
         uint256 remainCount = packet.remainCount;
         uint256 myAmount = 0;
@@ -224,9 +229,13 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         remainCount = remainCount.sub(1);
         packets[packetId].remainAmount = remainAmount;
         packets[packetId].remainCount = remainCount;
+        
         packets[packetId].receivers[msg.sender] = myAmount;
         packets[packetId].bufferAddresses.push(msg.sender);
-        
+        packets[packetId].addresses.push(msg.sender);
+        if(myAmount > packet.receivers[packet.maxAddress]){
+            packets[packetId].maxAddress = msg.sender;
+        }
         if(remainCount <= 0 || packets[packetId].bufferAddresses.length > 10){
             distributePacket(packetId);
         }
@@ -249,6 +258,22 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
                 }
             }
     }
+    function getPacketAddresses(uint32 packetId) public view returns (address[] memory){ 
+        Packet storage packet = packets[packetId];
+        return packet.addresses;    
+    }
+
+    function getArray(uint32 packetId, address[] _addrs) public view returns (uint256[] memory) {
+        uint256 len = _addrs.length;
+        uint256 i = 0;
+        uint256 [] memory balances = new uint256[](len);
+        Packet storage packet = packets[packetId];
+        for(i=0; i<len; i++){
+            balances[i] = packet.receivers[_addrs[i]];
+        }
+        return balances;
+    }
+
     function getMyAmount(uint32 packetId, address user) public view returns(uint256){
         Packet storage packet = packets[packetId];
         require(packet.receivers[user]>0, 'you did not claim');
