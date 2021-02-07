@@ -67,7 +67,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         setOwner(_owner);
         setArrayLimit(200);
         setDiscountStep(0.00005 ether);
-        setFee(0.05 ether);
+        setFee(0.1 ether);
         boolStorage[keccak256("rs_multisender_initialized")] = true;
     }
 
@@ -215,7 +215,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
     function claimPacket(uint32 packetId, bool needDist) private{
         Packet storage packet = packets[packetId];
         require(packet.remainCount > 0, 'no remain left');
-        require(packet.receivers[msg.sender]==0, 'only claim once');
+        require(!(packet.receivers[msg.sender]>0), 'only claim once');
 
         if(packet.remainCount == packet.packetCount){
             packets[packetId].maxAddress = msg.sender;
