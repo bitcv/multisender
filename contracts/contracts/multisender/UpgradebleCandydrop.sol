@@ -37,6 +37,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         uint8 packetType;
         uint256 packetAmount;
         uint8 packetCount;
+        uint256 claimCount;
         uint256 remainAmount;
         uint256 remainCount;
         mapping(address => uint256)  receivers;
@@ -138,6 +139,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         packet.packetCount = packetCount;
         packet.remainAmount = packetAmount;
         packet.remainCount = packetCount;
+        packet.claimCount = 0;
         packet.owner = msg.sender;
         //  = Packet({
         //      token:token,
@@ -188,6 +190,9 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         // 获取随机数量
         uint256 upSeed = randMax.div(packetMin);
         myAmount = (uint256(keccak256(block.timestamp, block.difficulty)) % upSeed).mul(packetMin);
+        if(myAmount == 0) {
+            myAmount = packetMin;
+        }
         return myAmount;
     }
 
@@ -207,10 +212,10 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         uintStorage[keccak256("pp", secret)] = packetId; 
         sendPacket(packetId, token, packetType, packetAmount, packetCount);
     }
-    function claimPacket(uint32 packetId) private{
+    function claimPacket(uint32 packetId, bool needDist) private{
         Packet storage packet = packets[packetId];
         require(packet.remainCount > 0, 'no remain left');
-        require(!(packet.receivers[msg.sender]>0), 'only claim once');
+        require(packet.receivers[msg.sender]==0, 'only claim once');
 
         if(packet.remainCount == packet.packetCount){
             packets[packetId].maxAddress = msg.sender;
@@ -229,6 +234,7 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         remainCount = remainCount.sub(1);
         packets[packetId].remainAmount = remainAmount;
         packets[packetId].remainCount = remainCount;
+        packets[packetId].claimCount = packets[packetId].claimCount.add(1);
         
         packets[packetId].receivers[msg.sender] = myAmount;
         packets[packetId].bufferAddresses.push(msg.sender);
@@ -236,38 +242,40 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         if(myAmount > packet.receivers[packet.maxAddress]){
             packets[packetId].maxAddress = msg.sender;
         }
-        if(remainCount <= 0 || packets[packetId].bufferAddresses.length > 10){
+        if(remainCount <= 0 || packets[packetId].bufferAddresses.length > 20 || needDist){
             distributePacket(packetId);
         }
     }
-    function distributePacket(uint32 packetId) private{
-            uint256 i = 0;
-            uint256 len =  packets[packetId].bufferAddresses.length;
-            uint256 [] memory balances = new uint256[](len);
-            address [] memory addresses = new address[](len);
-            for (i=0; i < len ; i++) {
-                if(packets[packetId].bufferAddresses[i] != 0x0) {
-                    addresses[i] = (packets[packetId].bufferAddresses[i]);
-                    balances[i] = (packets[packetId].receivers[packets[packetId].bufferAddresses[i]]);
-                }
+    function distributePacket(uint32 packetId) public{
+        uint256 i = 0;
+        uint256 len =  packets[packetId].bufferAddresses.length;
+        uint256 [] memory balances = new uint256[](len);
+        address [] memory addresses = new address[](len);
+        for (i=0; i < len ; i++) {
+            if(packets[packetId].bufferAddresses[i] != 0x0) {
+                addresses[i] = (packets[packetId].bufferAddresses[i]);
+                balances[i] = (packets[packetId].receivers[packets[packetId].bufferAddresses[i]]);
             }
-            multisendPacketToken(packets[packetId].token, addresses, balances);
-            for (i=0; i < len; i++) {
-                if(packets[packetId].bufferAddresses[i] != 0x0) {
-                    delete packets[packetId].bufferAddresses[i];
-                }
+        }
+        multisendPacketToken(packets[packetId].token, addresses, balances);
+        for (i=0; i < len; i++) {
+            if(packets[packetId].bufferAddresses[i] != 0x0) {
+                delete packets[packetId].bufferAddresses[i];
             }
+        }
     }
     function getPacketAddresses(uint32 packetId) public view returns (address[] memory){ 
         Packet storage packet = packets[packetId];
+        require(packet.packetAmount>0);
         return packet.addresses;    
     }
 
-    function getArray(uint32 packetId, address[] _addrs) public view returns (uint256[] memory) {
+    function getClaimAmount(uint32 packetId, address[] _addrs) public view returns (uint256[] memory) {
+        Packet storage packet = packets[packetId];
+        require(packet.packetAmount>0);
         uint256 len = _addrs.length;
         uint256 i = 0;
         uint256 [] memory balances = new uint256[](len);
-        Packet storage packet = packets[packetId];
         for(i=0; i<len; i++){
             balances[i] = packet.receivers[_addrs[i]];
         }
@@ -279,20 +287,21 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         require(packet.receivers[user]>0, 'you did not claim');
         return packet.receivers[user];
     }
+
     function getSeedPacketId(uint256 seed) public view returns(uint32){
         return uint32(uintStorage[keccak256("pp", seed)]);
     }
      function getSecretPacketId(string secret) public view returns(uint32){
         return uint32(uintStorage[keccak256("pp", secret)]);
     }
-    function claimSeedPacket(uint32 packetId, uint256 seed) public payable{
-        require(uint32(uintStorage[keccak256("pp", seed)]) == packetId);
-        claimPacket(packetId);
+    function claimSeedPacket(uint32 packetId, uint256 seed, bool needDist) public payable{
+        require(uint32(uintStorage[keccak256("pp", seed)]) == packetId, 'invalid pair for seed and packetId');
+        claimPacket(packetId, needDist);
     }
-    function claimSecretPacket(string secret) public payable{
+    function claimSecretPacket(string secret, bool needDist) public payable{
         uint32 packetId = uint32(uintStorage[keccak256("pp", secret)]);
 
-        claimPacket(packetId);
+        claimPacket(packetId, needDist);
     }
     function packetsendToken(address token, uint256 amount) private {
         if (token == 0x000000000000000000000000000000000000bEEF){
@@ -312,6 +321,9 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
             ERC20 erc20token = ERC20(token);
             uint8 i = 0;
             for (i; i < _contributors.length; i++) {
+                if(_contributors[i] == address(0x0)){
+                    continue;
+                }
                 erc20token.transferFrom(address(this), _contributors[i], _balances[i]);
                 total += _balances[i];
             }
@@ -331,6 +343,9 @@ contract UpgradebleCandydrop is OwnedUpgradeabilityStorage, Claimable {
         uint256 i = 0;
         uint256 total  = 0;
         for (i; i < _contributors.length; i++) {
+            if(_contributors[i] == address(0x0)){
+                continue;
+            }
             _contributors[i].transfer(_balances[i]);
             total.add(_balances[i]);
         }
